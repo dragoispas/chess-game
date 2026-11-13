@@ -1,0 +1,42 @@
+.credits-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: min(100%, 520px);
+}
+
+.credits-section h2 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  color: var(--text-h);
+}
+
+.credits-section p,
+.credits-section li {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.credits-section ul {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.credits-section a {
+  color: var(--accent);
+}
+
+.credits-section code {
+  font-size: 0.85em;
+}
+
+.credits-footnote {
+  margin-top: 10px !important;
+  font-size: 0.85rem !important;
+  color: var(--text);
+  opacity: 0.85;
+}

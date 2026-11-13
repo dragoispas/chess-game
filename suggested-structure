@@ -1,0 +1,18 @@
+src/
+  app/                 App shell, routes later
+  engine/              Pure TS — no React
+    types.ts           Square, Color, PieceId, Board, Move, GameState
+    board.ts           createBoard, getPiece, applyMove
+    moves/             legalMoves(piece, board) helpers
+    variants/
+      classic.ts       piece catalog + starting position
+      sniper.ts        bishop → sniper rules
+      dragon.ts        knight → dragon rules
+    game.ts            whose turn, check, apply move, history
+  ui/
+    Board.tsx          8×8 grid, clicks / drag
+    Square.tsx
+    Piece.tsx          looks up glyph/sprite by PieceId
+    GameScreen.tsx     board + clocks + move list
+  shared/
+    coords.ts          a1 ↔ {file,rank} / index 0–63

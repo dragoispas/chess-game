@@ -1,0 +1,42 @@
+{
+  "name": "chess-game",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n web,api -c cyan,magenta \"vite\" \"npm run server:dev\"",
+    "dev:web": "vite",
+    "server:dev": "tsx watch server/src/index.ts",
+    "server": "tsx server/src/index.ts",
+    "start": "tsx server/src/index.ts",
+    "start:server": "tsx server/src/index.ts",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint src server/src",
+    "preview": "vite preview",
+    "postinstall": "mkdir -p public/fairy-stockfish public/licenses/fairy-stockfish && cp node_modules/fairy-stockfish-nnue.wasm/stockfish.js node_modules/fairy-stockfish-nnue.wasm/stockfish.wasm node_modules/fairy-stockfish-nnue.wasm/stockfish.worker.js public/fairy-stockfish/ && cp node_modules/fairy-stockfish-nnue.wasm/Copying.txt public/licenses/fairy-stockfish/COPYING.txt && cp node_modules/fairy-stockfish-nnue.wasm/AUTHORS public/licenses/fairy-stockfish/AUTHORS"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.6",
+    "better-sqlite3": "^13.0.3",
+    "drizzle-orm": "^0.45.4",
+    "fairy-stockfish-nnue.wasm": "^1.1.12",
+    "hono": "^4.13.17",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tsx": "^4.23.15",
+    "ws": "^8.22.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/ws": "^8.18.2",
+    "@vitejs/plugin-react": "^6.1.2",
+    "concurrently": "^10.0.7",
+    "drizzle-kit": "^0.31.11",
+    "oxlint": "^1.88.0",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.4"
+  }
+}

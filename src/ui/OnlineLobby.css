@@ -1,0 +1,49 @@
+.online-lobby .online-status {
+  margin: 0;
+  text-align: center;
+  color: var(--text);
+}
+
+.online-lobby .online-code-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.online-lobby .online-code {
+  margin: 0;
+  font-size: 1.25rem;
+  letter-spacing: 0.08em;
+}
+
+.online-lobby .online-error {
+  margin: 0;
+  color: #b42318;
+  text-align: center;
+}
+
+.play-menu .resume-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.online-join {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.online-join input {
+  flex: 1;
+  font: inherit;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 8px 10px;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text-h);
+}
