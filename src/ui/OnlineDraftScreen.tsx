@@ -19,6 +19,10 @@ import {
   type OnlineReady,
 } from './OnlineLobby.tsx'
 import { Piece as PieceView } from './Piece.tsx'
+import {
+  connectionStatusLabel,
+  useConnectionStatus,
+} from './useConnectionStatus.ts'
 import './Board.css'
 import './EditorScreen.css'
 import './DraftScreen.css'
@@ -63,6 +67,9 @@ export function OnlineDraftScreen({
   const [error, setError] = useState<string | null>(null)
   const handedOffRef = useRef(false)
   const onReadyRef = useRef(onReady)
+  const connectionStatus = useConnectionStatus(session.socket)
+  const connectionLabel = connectionStatusLabel(connectionStatus)
+  const linked = connectionStatus === 'connected'
 
   const color = session.you
   const size = session.size
@@ -71,6 +78,10 @@ export function OnlineDraftScreen({
   useEffect(() => {
     onReadyRef.current = onReady
   }, [onReady])
+
+  useEffect(() => {
+    session.socket.setResumeRoom(session.code)
+  }, [session.socket, session.code])
 
   useEffect(() => {
     const unsubscribe = session.socket.subscribe((message: ServerMessage) => {
@@ -99,11 +110,13 @@ export function OnlineDraftScreen({
   const spent = spentOnBoard(board, color)
   const remaining = budget - spent
   const kings = countKings(board, color)
-  const canConfirm = kings === 1 && remaining >= 0 && !youReady
+  const canConfirm =
+    linked && kings === 1 && remaining >= 0 && !youReady
 
   const sideLabel: Color = color
 
   const statusLine = useMemo(() => {
+    if (connectionLabel) return connectionLabel
     const opp =
       color === 'white'
         ? seats.blackConnected
@@ -116,10 +129,10 @@ export function OnlineDraftScreen({
     if (youReady) return `Locked in — waiting for opponent (${opp}).`
     if (opponentReady) return `Opponent is ready (${opp}). Finish your army.`
     return `Drafting simultaneously — opponent ${opp}.`
-  }, [youReady, opponentReady, seats, color])
+  }, [connectionLabel, youReady, opponentReady, seats, color])
 
   function handleSquareClick(square: SquareIndex) {
-    if (youReady) return
+    if (!linked || youReady) return
     if (!isDraftSquare(color, square, size)) return
     setError(null)
     if (selected === 'erase') {
@@ -138,7 +151,7 @@ export function OnlineDraftScreen({
   }
 
   function handleClear() {
-    if (youReady) return
+    if (!linked || youReady) return
     setError(null)
     session.socket.send({ type: 'draft:clear' })
   }
@@ -150,6 +163,7 @@ export function OnlineDraftScreen({
   }
 
   function handleUnconfirm() {
+    if (!linked) return
     setError(null)
     session.socket.send({ type: 'draft:unconfirm' })
   }
@@ -181,8 +195,16 @@ export function OnlineDraftScreen({
         </div>
       </header>
 
-      <p className="online-status" aria-live="polite">
-        {statusLine}
+      <p
+        className={[
+          'online-status',
+          connectionLabel || error ? 'status-alert' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        aria-live="polite"
+      >
+        {error && !connectionLabel ? error : statusLine}
       </p>
 
       <div className="draft-budget" aria-live="polite">
@@ -210,7 +232,7 @@ export function OnlineDraftScreen({
               types={CLASSIC_PIECES}
               selected={selected}
               remaining={remaining}
-              disabled={youReady}
+              disabled={youReady || !linked}
               onSelect={setSelected}
             />
           </section>
@@ -221,7 +243,7 @@ export function OnlineDraftScreen({
               types={EXPANSION_PIECES}
               selected={selected}
               remaining={remaining}
-              disabled={youReady}
+              disabled={youReady || !linked}
               onSelect={setSelected}
             />
           </section>
@@ -236,7 +258,7 @@ export function OnlineDraftScreen({
               .join(' ')}
             onClick={() => setSelected('erase')}
             aria-pressed={selected === 'erase'}
-            disabled={youReady}
+            disabled={youReady || !linked}
           >
             Erase
           </button>
@@ -258,7 +280,7 @@ export function OnlineDraftScreen({
               <button
                 key={square}
                 type="button"
-                disabled={!own || youReady}
+                disabled={!own || youReady || !linked}
                 className={[
                   'square',
                   light ? 'light' : 'dark',
@@ -282,7 +304,7 @@ export function OnlineDraftScreen({
           type="button"
           className="reset"
           onClick={handleClear}
-          disabled={youReady}
+          disabled={youReady || !linked}
         >
           Clear my half
         </button>
@@ -291,6 +313,7 @@ export function OnlineDraftScreen({
             type="button"
             className="reset"
             onClick={handleUnconfirm}
+            disabled={!linked}
           >
             Unconfirm
           </button>

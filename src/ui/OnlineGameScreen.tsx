@@ -10,6 +10,7 @@ import type {
   GameState,
   LastMove,
   Piece,
+  SquareIndex,
 } from '../engine/types.ts'
 import { removeActiveOnline } from '../online/activeOnline.ts'
 import type { ServerMessage } from '../online/protocol.ts'
@@ -19,7 +20,12 @@ import { ClockStack } from './Clocks.tsx'
 import { MoveList } from './MoveList.tsx'
 import type { OnlineReady } from './OnlineLobby.tsx'
 import { SeatBar } from './SeatBar.tsx'
+import {
+  connectionStatusLabel,
+  useConnectionStatus,
+} from './useConnectionStatus.ts'
 import './GameScreen.css'
+import './OnlineLobby.css'
 
 function capitalize(color: string): string {
   return color.charAt(0).toUpperCase() + color.slice(1)
@@ -90,6 +96,20 @@ function useLiveClocks(snapshot: ClockSnapshot | null) {
   }, [snapshot, now])
 }
 
+type Snapshot = {
+  game: GameState
+  lastMove: LastMove | null
+  moves: string[]
+  capturedByWhite: Piece[]
+  capturedByBlack: Piece[]
+}
+
+type PendingMove = {
+  from: SquareIndex
+  to: SquareIndex
+  rollback: Snapshot
+}
+
 type OnlineGameScreenProps = {
   session: OnlineReady
   onBack: () => void
@@ -110,8 +130,30 @@ export function OnlineGameScreen({ session, onBack }: OnlineGameScreenProps) {
   const [clock, setClock] = useState<ClockSnapshot>(session.clock)
   const [seats, setSeats] = useState(session.seats)
   const live = useLiveClocks(clock)
+  const pendingRef = useRef<PendingMove | null>(null)
+  const [moveInFlight, setMoveInFlight] = useState(false)
+  const connectionStatus = useConnectionStatus(socket)
+  const connectionLabel = connectionStatusLabel(connectionStatus)
+  const linked = connectionStatus === 'connected'
   const opponentConnected =
     you === 'white' ? seats.blackConnected : seats.whiteConnected
+
+  function applySnapshot(snap: Snapshot) {
+    setGame(snap.game)
+    setLastMove(snap.lastMove)
+    setMoves(snap.moves)
+    setCapturedByWhite(snap.capturedByWhite)
+    setCapturedByBlack(snap.capturedByBlack)
+  }
+
+  function clearPending() {
+    pendingRef.current = null
+    setMoveInFlight(false)
+  }
+
+  useEffect(() => {
+    socket.setResumeRoom(code)
+  }, [socket, code])
 
   useEffect(() => {
     if (session.state.status !== 'ongoing') {
@@ -120,8 +162,21 @@ export function OnlineGameScreen({ session, onBack }: OnlineGameScreenProps) {
   }, [session.state.status, code])
 
   useEffect(() => {
+    if (linked) return
+    const pending = pendingRef.current
+    if (!pending) return
+    applySnapshot(pending.rollback)
+    clearPending()
+  }, [linked])
+
+  useEffect(() => {
     return socket.subscribe((message: ServerMessage) => {
       if (message.type === 'error') {
+        const pending = pendingRef.current
+        if (pending) {
+          applySnapshot(pending.rollback)
+          clearPending()
+        }
         setError(message.message)
         return
       }
@@ -132,37 +187,63 @@ export function OnlineGameScreen({ session, onBack }: OnlineGameScreenProps) {
         if (message.state.status !== 'ongoing') {
           removeActiveOnline(code)
         }
-        setGame((prev) => {
-          if (message.lastMove) {
+
+        const pending = pendingRef.current
+        const confirmsPending =
+          pending != null &&
+          message.lastMove != null &&
+          message.lastMove.from === pending.from &&
+          message.lastMove.to === pending.to
+
+        if (confirmsPending) {
+          clearPending()
+          setGame(message.state)
+          setLastMove(message.lastMove)
+          if (message.moveLabel) {
+            setMoves((prev) =>
+              prev.length === 0
+                ? [message.moveLabel!]
+                : [...prev.slice(0, -1), message.moveLabel!],
+            )
+          }
+          return
+        }
+
+        // Opponent move (or any non-pending update): apply from pre-move board.
+        if (message.lastMove) {
+          setGame((prev) => {
             const position = toPosition(prev)
             const label =
               message.moveLabel ??
               formatMoveLabel(
                 position,
-                message.lastMove.from,
-                message.lastMove.to,
+                message.lastMove!.from,
+                message.lastMove!.to,
               )
             const captured = pieceCapturedOnMove(
               position,
-              message.lastMove.from,
-              message.lastMove.to,
+              message.lastMove!.from,
+              message.lastMove!.to,
             )
-            queueMicrotask(() => {
-              setMoves((m) => [...m, label])
-              if (captured) {
-                if (captured.color === 'black') {
-                  setCapturedByWhite((c) => [...c, captured])
-                } else {
-                  setCapturedByBlack((c) => [...c, captured])
-                }
+            setMoves((m) => [...m, label])
+            if (captured) {
+              if (captured.color === 'black') {
+                setCapturedByWhite((c) => [...c, captured])
+              } else {
+                setCapturedByBlack((c) => [...c, captured])
               }
-            })
-          }
-          return message.state
-        })
-        setLastMove(message.lastMove)
+            }
+            return message.state
+          })
+          setLastMove(message.lastMove)
+        } else {
+          setGame(message.state)
+          setLastMove(message.lastMove)
+        }
+        return
       }
       if (message.type === 'room:ready' && !message.waiting) {
+        clearPending()
         setGame(message.state)
         setClock(message.clock)
         setSeats(message.seats)
@@ -175,15 +256,46 @@ export function OnlineGameScreen({ session, onBack }: OnlineGameScreenProps) {
     })
   }, [socket, code])
 
-  const interactive = useMemo(
-    () => game.status === 'ongoing' && game.turn === you,
-    [game.status, game.turn, you],
+  const boardInteractive = useMemo(
+    () =>
+      linked &&
+      game.status === 'ongoing' &&
+      game.turn === you &&
+      !moveInFlight,
+    [linked, game.status, game.turn, you, moveInFlight],
   )
 
   const topColor: Color = you === 'white' ? 'black' : 'white'
   const bottomColor: Color = you
 
-  function handleMove({ from, to, promotion }: BoardMoveEvent) {
+  function handleMove({ state, from, to, promotion }: BoardMoveEvent) {
+    if (pendingRef.current || moveInFlight) return
+
+    const rollback: Snapshot = {
+      game,
+      lastMove,
+      moves,
+      capturedByWhite,
+      capturedByBlack,
+    }
+    pendingRef.current = { from, to, rollback }
+    setMoveInFlight(true)
+
+    const position = toPosition(game)
+    const label = formatMoveLabel(position, from, to, promotion)
+    const captured = pieceCapturedOnMove(position, from, to)
+
+    setGame(state)
+    setLastMove({ from, to })
+    setMoves((m) => [...m, label])
+    if (captured) {
+      if (captured.color === 'black') {
+        setCapturedByWhite((c) => [...c, captured])
+      } else {
+        setCapturedByBlack((c) => [...c, captured])
+      }
+    }
+
     socket.send({ type: 'move', from, to, promotion })
   }
 
@@ -219,12 +331,15 @@ export function OnlineGameScreen({ session, onBack }: OnlineGameScreenProps) {
                 game.status !== 'ongoing' ||
                 game.inCheck ||
                 error ||
+                connectionLabel ||
                 !opponentConnected
                   ? 'status-alert'
                   : ''
               }
             >
-              {error ?? statusMessage(game, you, opponentConnected)}
+              {connectionLabel ??
+                error ??
+                statusMessage(game, you, opponentConnected)}
             </p>
           </div>
         </div>
@@ -245,7 +360,7 @@ export function OnlineGameScreen({ session, onBack }: OnlineGameScreenProps) {
           <Board
             game={game}
             lastMove={lastMove}
-            interactive={interactive}
+            interactive={boardInteractive}
             orientation={you}
             onMove={handleMove}
           />
@@ -278,7 +393,7 @@ export function OnlineGameScreen({ session, onBack }: OnlineGameScreenProps) {
           <button
             type="button"
             className="reset sidebar-resign"
-            disabled={game.status !== 'ongoing'}
+            disabled={!linked || game.status !== 'ongoing'}
             onClick={handleResign}
           >
             Resign

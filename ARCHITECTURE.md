@@ -124,6 +124,7 @@ Leaving Play (or hitting Back) closes the socket and clears online session state
 - Those screens keep **local mirrors** of board/state/clocks for rendering; authoritative updates arrive as server messages.
 - Guest id: `sessionStorage` (`playerId.ts`) so two tabs on one machine can be two players.
 - Resume codes: `localStorage` via `activeOnline.ts`.
+- **Optimistic moves** and **auto-reconnect**: see [`docs/ONLINE_UX_FIXES.md`](./docs/ONLINE_UX_FIXES.md).
 
 ### Board UI
 

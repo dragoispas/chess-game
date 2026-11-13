@@ -161,6 +161,19 @@ export function OnlineLobby({
     acceptedCodeRef.current =
       intent.action === 'join' ? intent.code.trim().toUpperCase() : null
 
+    if (intent.action === 'join') {
+      connection.setResumeRoom(intent.code)
+    }
+
+    const unsubConnection = connection.subscribeConnection((connStatus) => {
+      if (cancelled || handedOffRef.current) return
+      if (connStatus === 'reconnecting' || connStatus === 'disconnected') {
+        setStatus('Connection lost — reconnecting…')
+      } else if (connStatus === 'connecting' && !startedRef.current) {
+        setStatus('Connecting…')
+      }
+    })
+
     void connection.ready
       .then(() => {
         if (cancelled || startedRef.current) return
@@ -180,9 +193,11 @@ export function OnlineLobby({
         }
       })
       .catch(() => {
-        if (!cancelled) {
-          setStatus('Could not reach the game server.')
-          setError('Start the API with npm run server (or npm run dev).')
+        if (!cancelled && !handedOffRef.current) {
+          setStatus('Could not reach the game server — retrying…')
+          setError(
+            'Check your connection. If developing locally, run npm run dev (or the API).',
+          )
         }
       })
 
@@ -199,6 +214,7 @@ export function OnlineLobby({
       }
       if (message.type === 'room:created') {
         acceptedCodeRef.current = message.code
+        connection.setResumeRoom(message.code)
         setCode(message.code)
         setActiveOnline({ code: message.code })
         setStatus(
@@ -209,6 +225,7 @@ export function OnlineLobby({
       }
       if (message.type === 'room:joined') {
         acceptedCodeRef.current = message.code
+        connection.setResumeRoom(message.code)
         setCode(message.code)
         setActiveOnline({ code: message.code })
         setStatus(`Joined ${message.code}`)
@@ -258,6 +275,7 @@ export function OnlineLobby({
     return () => {
       cancelled = true
       unsubscribe()
+      unsubConnection()
       if (!handedOffRef.current) {
         connection.send({ type: 'room:leave' })
         connection.close()

@@ -57,6 +57,7 @@ Opens the UI with hot reload and the online API on port 3001. Local and Stockfis
 | Doc | Contents |
 |-----|----------|
 | [`ARCHITECTURE.md`](./ARCHITECTURE.md) | Code structure, stack, state, server, deploy |
+| [`docs/ONLINE_UX_FIXES.md`](./docs/ONLINE_UX_FIXES.md) | Optimistic moves + reconnect (problem / fix) |
 | [`TODO.md`](./TODO.md) | Improvement backlog |
 | [`Credits`](./src/ui/CreditsScreen.tsx) (in-app) | Attribution |
 
