@@ -3,10 +3,14 @@ import {
   CLASSIC_PIECES,
   EXPANSION_PIECES,
   isDraftSquare,
-  pieceCost,
 } from '../engine/catalog.ts'
 import { countKings, spentOnBoard } from '../engine/draft.ts'
-import type { Color, PieceType, SquareIndex } from '../engine/types.ts'
+import type {
+  BoardSize,
+  Color,
+  PieceType,
+  SquareIndex,
+} from '../engine/types.ts'
 import type { ServerMessage } from '../online/protocol.ts'
 import { fileRankToIndex, indexToFileRank } from '../shared/coords.ts'
 import {
@@ -28,7 +32,7 @@ type OnlineDraftScreenProps = {
   onBack: () => void
 }
 
-function boardSquares(size: number, orientation: Color): SquareIndex[] {
+function boardSquares(size: BoardSize, orientation: Color): SquareIndex[] {
   const list: SquareIndex[] = []
   if (orientation === 'white') {
     for (let rank = size - 1; rank >= 0; rank--) {
